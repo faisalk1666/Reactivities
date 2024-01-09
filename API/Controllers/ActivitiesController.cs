@@ -1,55 +1,50 @@
-using AutoMapper;
+using Application;
+using Application.Activities;
 using Domain;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Persistence;
 
 namespace API.Controllers
 {
     public class ActivitiesController : BaseApiController
     {
-        private readonly DataContext _context;
-        private readonly IMapper _mapper;
-        public ActivitiesController(DataContext context, IMapper mapper)
-        {
-            _mapper = mapper;
-            _context = context;
-        }
+        
         [HttpGet]
-        public async Task<ActionResult<List<ActivityDTO>>> GetActivities()
+        public async Task<ActionResult<List<Activity>>> GetActivities()
         {
-            var activities = await _context.Activities.ToListAsync();
-            return _mapper.Map<List<ActivityDTO>>(activities);
+            return await Mediator.Send(new List.Query());
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<ActivityDTO>> GetActivity(Guid id)
+        public async Task<ActionResult<Activity>> GetActivity(Guid id)
         {
-            var activity = await _context.Activities.FindAsync(id);
-            return _mapper.Map<ActivityDTO>(activity);
+            return await Mediator.Send(new Details.Query{Id = id});
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddActivity(string Title, string Description, string City, string Venue)
+        public async Task<IActionResult> AddActivity(Activity activity)
         {
             try
             {
-                var activityDTO = new ActivityDTO
-                {
-                    Title = Title,
-                    Date = DateTime.UtcNow,
-                    Description = Description,
-                    City = City,
-                    Venue = Venue
-                };
-                var activity = _mapper.Map<Activity>(activityDTO);
-                await _context.Activities.AddAsync(activity);
-                await _context.SaveChangesAsync();
+                await Mediator.Send(new Create.Command{Activity = activity});
                 return Ok("Activity added successfully");
             }
             catch (Exception ex)
             {
                 return StatusCode(500, "Internal Server Error"); // Return an appropriate status code and message for an error
+            }
+        }
+        [HttpPut]
+        public async Task<IActionResult> EditActivity(Guid id, Activity activity)
+        {
+            try
+            {
+                activity.Id = id;
+                await Mediator.Send(new Edit.Command{Activity = activity});
+                return Ok("Activity Updated Successfully");
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500, "Internal Server Error");
             }
         }
 
@@ -58,9 +53,7 @@ namespace API.Controllers
         {
             try
             {
-                var activity = await _context.Activities.FindAsync(id);
-                _context.Activities.Remove(activity);
-                await _context.SaveChangesAsync();
+                await Mediator.Send(new Delete.Command{Id = id});
             }
             catch (Exception ex)
             {
